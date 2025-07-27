@@ -1,65 +1,82 @@
 <?php
 require_once __DIR__ . '/../models/Product.php';
 
-class ProductController {
+class ProductController
+{
     private $model;
-    
-    public function __construct() {
+
+    public function __construct()
+    {
         $this->model = new Product();
     }
-    
-    public function handleRequest() {
+
+    public function handleRequest()
+    {
         $method = $_SERVER['REQUEST_METHOD'];
-        
+
         try {
             switch ($method) {
                 case 'GET':
                     $id = $_GET['id'] ?? null;
                     if ($id) {
-                        $Product = $this->model->getById($id);
-                        echo json_encode($Product);
+                        $product = $this->model->getById($id);
+                        echo json_encode($product);
                     } else {
-                        $Products = $this->model->getAll();
-                        echo json_encode($Products);
+                        $products = $this->model->getAll();
+                        echo json_encode($products);
                     }
                     break;
-                    
+
                 case 'POST':
-                    $data = json_decode(file_get_contents("php://input"), true);
-                    if (!$data) {
-                        http_response_code(400);
-                        echo json_encode(['error' => 'Invalid JSON or empty body']);
-                        return;
+                    $data = $_POST;
+                    $requiredFields = ['set_id', 'rarity_id', 'name', 'price', 'stock_quantity'];
+                    foreach ($requiredFields as $field) {
+                        if (empty($data[$field])) {
+                            http_response_code(400);
+                            echo json_encode(['error' => "Validasi Gagal: Field '{$field}' tidak boleh kosong."]);
+                            return;
+                        }
                     }
-                    
-                    $Product = $this->model->create($data);
-                    http_response_code(201);
-                    echo json_encode(['success' => true, 'data' => $Product]);
-                    break;
-                    
-                case 'PUT':
-                    $id = $_GET['id'] ?? null;
-                    if (!$id) {
-                        http_response_code(400);
-                        echo json_encode(['error' => 'Missing ID in query']);
-                        return;
+
+                    if (isset($_FILES['image_url']) && $_FILES['image_url']['error'] === UPLOAD_ERR_OK) {
+                        $targetDir = __DIR__ . '/../uploads/';
+                        if (!is_dir($targetDir)) {
+                            mkdir($targetDir, 0777, true);
+                        }
+                        $fileName = uniqid() . '-' . basename($_FILES["image_url"]["name"]);
+                        $targetFile = $targetDir . $fileName;
+                        if (move_uploaded_file($_FILES["image_url"]["tmp_name"], $targetFile)) {
+                            $data['image_url'] = 'http://localhost/api-tcg/uploads/' . $fileName;
+                        }
+                        if (!move_uploaded_file($_FILES["image_url"]["tmp_name"], $targetFile)) {
+                            error_log("Gagal memindahkan file: " . $_FILES["image_url"]["tmp_name"] . " ke " . $targetFile);
+                            error_log("Error code: " . $_FILES["image_url"]["error"]);
+                        }
                     }
-                    $data = json_decode(file_get_contents("php://input"), true);
-                    $success = $this->model->update($id, $data);
-                    echo json_encode(['success' => $success]);
+
+                    if (isset($data['_method']) && $data['_method'] === 'PUT' && isset($data['id'])) {
+                        $id = $data['id'];
+                        unset($data['_method'], $data['id']);
+                        $success = $this->model->update($id, $data);
+                        echo json_encode(['success' => $success]);
+                    } else {
+                        $product = $this->model->create($data);
+                        http_response_code(201);
+                        echo json_encode(['success' => true, 'data' => $product]);
+                    }
                     break;
-                    
+
                 case 'DELETE':
                     $id = $_GET['id'] ?? null;
-                    if (!$id) {
+                    if ($id) {
+                        $success = $this->model->delete($id);
+                        echo json_encode(['success' => $success]);
+                    } else {
                         http_response_code(400);
-                        echo json_encode(['error' => 'Missing ID in query']);
-                        return;
+                        echo json_encode(['error' => 'ID is required']);
                     }
-                    $success = $this->model->delete($id);
-                    echo json_encode(['success' => $success]);
                     break;
-                    
+
                 default:
                     http_response_code(405);
                     echo json_encode(['error' => 'Method not allowed']);
