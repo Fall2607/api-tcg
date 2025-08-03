@@ -1,16 +1,19 @@
 <?php
 require_once __DIR__ . '/../models/Rarity.php';
 
-class RarityController {
+class RarityController
+{
     private $model;
-    
-    public function __construct() {
+
+    public function __construct()
+    {
         $this->model = new Rarity();
     }
-    
-    public function handleRequest() {
+
+    public function handleRequest()
+    {
         $method = $_SERVER['REQUEST_METHOD'];
-        
+
         try {
             switch ($method) {
                 case 'GET':
@@ -23,7 +26,7 @@ class RarityController {
                         echo json_encode($Raritys);
                     }
                     break;
-                    
+
                 case 'POST':
                     $data = json_decode(file_get_contents("php://input"), true);
                     if (!$data) {
@@ -35,7 +38,7 @@ class RarityController {
                     http_response_code(201);
                     echo json_encode(['success' => true, 'data' => $Rarity]);
                     break;
-                    
+
                 case 'PUT':
                     $id = $_GET['id'] ?? null;
                     if (!$id) {
@@ -47,7 +50,7 @@ class RarityController {
                     $success = $this->model->update($id, $data);
                     echo json_encode(['success' => $success]);
                     break;
-                    
+
                 case 'DELETE':
                     $id = $_GET['id'] ?? null;
                     if (!$id) {
@@ -58,7 +61,7 @@ class RarityController {
                     $success = $this->model->delete($id);
                     echo json_encode(['success' => $success]);
                     break;
-                    
+
                 default:
                     http_response_code(405);
                     echo json_encode(['error' => 'Method not allowed']);
