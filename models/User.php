@@ -6,6 +6,24 @@ class User {
         $this->db = getDBConnection();
     }
     
+    public function getByEmail($email) {
+        $stmt = $this->db->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        
+        $result = $stmt->get_result();
+        return $result->fetch_assoc();
+    }
+
+    public function verifyCredentials($email, $password) {
+        $user = $this->getByEmail($email);
+        if (!$user) {
+            return false;
+        }
+        
+        return password_verify($password, $user['password']) ? $user : false;
+    }
+
     public function getAll() {
         $query = "SELECT id, name, email, role, phone_number, created_at FROM users";
         $result = $this->db->query($query);

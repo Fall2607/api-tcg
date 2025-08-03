@@ -6,102 +6,139 @@ class Order {
         $this->db = getDBConnection();
     }
 
-    // Ambil semua pesanan (admin)
     public function getAll() {
-        $result = $this->db->query("SELECT * FROM tb_orders ORDER BY created_at DESC");
-        return $result->fetch_all(MYSQLI_ASSOC);
+        $query = "SELECT * FROM tb_orders_simple";
+        $result = $this->db->query($query);
+
+        $orders = [];
+        while ($row = $result->fetch_assoc()) {
+            $orders[] = $row;
+        }
+
+        return $orders;
     }
 
-    // Ambil semua pesanan berdasarkan user_id
-    public function getAllByUser($user_id) {
-        $stmt = $this->db->prepare("SELECT * FROM tb_orders WHERE user_id = ? ORDER BY created_at DESC");
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    }
-
-    // Ambil pesanan berdasarkan ID
     public function getById($id) {
-        $stmt = $this->db->prepare("SELECT * FROM tb_orders WHERE id = ?");
+        $stmt = $this->db->prepare("SELECT * FROM tb_orders_simple WHERE id = ?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
-        return $stmt->get_result()->fetch_assoc();
+
+        $result = $stmt->get_result();
+        return $result->fetch_assoc();
     }
 
-    // Ambil pesanan berdasarkan status
-    public function getByStatus($status) {
-        $stmt = $this->db->prepare("SELECT * FROM tb_orders WHERE status = ?");
-        $stmt->bind_param("s", $status);
+    public function getByUserId($user_id) {
+        $stmt = $this->db->prepare("SELECT * FROM tb_orders_simple WHERE user_id = ?");
+        $stmt->bind_param("i", $user_id);
         $stmt->execute();
-        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        $result = $stmt->get_result();
+        $orders = [];
+        while ($row = $result->fetch_assoc()) {
+            $orders[] = $row;
+        }
+        return $orders;
     }
 
-    // Buat pesanan baru
     public function create($data) {
-        $user_id = $data['user_id'];
-        $shipping_address_id = $data['shipping_address_id'];
-        $total_amount = $data['total_amount'];
-        $status = $data['status'] ?? 'pending';
-        $payment_method = $data['payment_method'] ?? null;
-        $tracking_number = $data['tracking_number'] ?? null;
-
         $stmt = $this->db->prepare("
-            INSERT INTO tb_orders 
-            (user_id, shipping_address_id, total_amount, status, payment_method, tracking_number, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+            INSERT INTO tb_orders_simple 
+            (user_id, recipient_name, phone_number, address, city, postal_code, 
+             product_id, product_name, quantity, price_per_unit, total_price, 
+             payment_method, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
+
         $stmt->bind_param(
-            "iidsss",
-            $user_id,
-            $shipping_address_id,
-            $total_amount,
-            $status,
-            $payment_method,
-            $tracking_number
+            "isssssisiiiss",
+            $data['user_id'],
+            $data['recipient_name'],
+            $data['phone_number'],
+            $data['address'],
+            $data['city'],
+            $data['postal_code'],
+            $data['product_id'],
+            $data['product_name'],
+            $data['quantity'],
+            $data['price_per_unit'],
+            $data['total_price'],
+            $data['payment_method'],
+            $data['status']
         );
 
         if ($stmt->execute()) {
             return $this->getById($this->db->insert_id);
+        } else {
+            throw new Exception("Failed to create order: " . $stmt->error);
         }
-        return false;
     }
 
-
-    // Update pesanan secara umum
     public function update($id, $data) {
         $stmt = $this->db->prepare("
-            UPDATE tb_orders SET 
-            shipping_address_id = ?, 
-            total_amount = ?, 
-            status = ?, 
-            payment_method = ?, 
-            tracking_number = ?, 
-            updated_at = NOW()
+            UPDATE tb_orders_simple SET 
+                recipient_name = ?,
+                phone_number = ?,
+                address = ?,
+                city = ?,
+                postal_code = ?,
+                product_id = ?,
+                product_name = ?,
+                quantity = ?,
+                price_per_unit = ?,
+                total_price = ?,
+                payment_method = ?,
+                status = ?
             WHERE id = ?
         ");
+
         $stmt->bind_param(
-            "idsssi",
-            $data['shipping_address_id'],
-            $data['total_amount'],
-            $data['status'],
+            "sssssisiiissi",
+            $data['recipient_name'],
+            $data['phone_number'],
+            $data['address'],
+            $data['city'],
+            $data['postal_code'],
+            $data['product_id'],
+            $data['product_name'],
+            $data['quantity'],
+            $data['price_per_unit'],
+            $data['total_price'],
             $data['payment_method'],
-            $data['tracking_number'],
+            $data['status'],
             $id
         );
-        return $stmt->execute();
+
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to update order: " . $stmt->error);
+        }
+        
+        return $this->getById($id);
     }
 
-    // Update hanya status
     public function updateStatus($id, $status) {
-        $stmt = $this->db->prepare("UPDATE tb_orders SET status = ?, updated_at = NOW() WHERE id = ?");
+        $stmt = $this->db->prepare("
+            UPDATE tb_orders_simple SET 
+                status = ?
+            WHERE id = ?
+        ");
+
         $stmt->bind_param("si", $status, $id);
-        return $stmt->execute();
+
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to update order status: " . $stmt->error);
+        }
+        
+        return $this->getById($id);
     }
 
-    // Hapus pesanan
     public function delete($id) {
-        $stmt = $this->db->prepare("DELETE FROM tb_orders WHERE id = ?");
+        $stmt = $this->db->prepare("DELETE FROM tb_orders_simple WHERE id = ?");
         $stmt->bind_param("i", $id);
-        return $stmt->execute();
+
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to delete order: " . $stmt->error);
+        }
+        
+        return true;
     }
 }
